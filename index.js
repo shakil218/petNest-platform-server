@@ -1,15 +1,14 @@
-const express = require('express')
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const cors =require('cors');
-const dotenv = require('dotenv');
-dotenv.config()
+const express = require("express");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const cors = require("cors");
+const dotenv = require("dotenv");
+dotenv.config();
 
-const app = express()
-const port = process.env.PORT
+const app = express();
+const port = process.env.PORT;
 
-app.use(cors())
-app.use(express.json())
-
+app.use(cors());
+app.use(express.json());
 
 const uri = process.env.MONGO_DB_URI;
 
@@ -19,7 +18,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -27,15 +26,37 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    const db=client.db('petNestDB')
-    const petsCollection=db.collection('pets');
+    const db = client.db("petNestDB");
+    const petsCollection = db.collection("pets");
 
+    // get all pets
+    app.get("/pets", async (req, res) => {
+      const results = await petsCollection.find().toArray();
+      res.send(results);
+    });
 
+    // get pet by id
+    app.get("/pets/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
 
+        const pet = await petsCollection.findOne({ _id: id });
+
+        if (!pet) {
+          return res.status(404).json({ error: "Pet not found" });
+        }
+
+        res.json(pet);
+      } catch (error) {
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!",
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -43,11 +64,10 @@ async function run() {
 }
 run().catch(console.dir);
 
-
-app.get('/', (req, res) => {
-  res.send('The petNest platform server is running!')
-})
+app.get("/", (req, res) => {
+  res.send("The petNest platform server is running!");
+});
 
 app.listen(port, () => {
-  console.log(`server running on port ${port}`)
-})
+  console.log(`server running on port ${port}`);
+});
