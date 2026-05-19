@@ -29,6 +29,17 @@ async function run() {
     const db = client.db("petNestDB");
     const petsCollection = db.collection("pets");
 
+    // Add a new pet
+    app.post("/pets", async (req, res) => {
+      try {
+        const petData = req.body;
+        const result = await petsCollection.insertOne(petData);
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to add pet" });
+      }
+    });
+
     // get all pets
     app.get("/pets", async (req, res) => {
       const results = await petsCollection.find().toArray();
@@ -39,8 +50,9 @@ async function run() {
     app.get("/pets/:id", async (req, res) => {
       try {
         const id = req.params.id;
+        console.log(id);
 
-        const pet = await petsCollection.findOne({ _id: id });
+        const pet = await petsCollection.findOne({ _id: new ObjectId(id) });
 
         if (!pet) {
           return res.status(404).json({ error: "Pet not found" });
