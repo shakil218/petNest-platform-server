@@ -31,7 +31,6 @@ async function run() {
     const adoptionRequestsCollection = db.collection("adoptionRequests");
 
     // ADD PET
-
     app.post("/pets", async (req, res) => {
       try {
         const result = await petsCollection.insertOne(req.body);
@@ -45,7 +44,6 @@ async function run() {
     });
 
     // GET ALL PETS
-
     app.get("/pets", async (req, res) => {
       const pets = await petsCollection.find().toArray();
 
@@ -53,7 +51,6 @@ async function run() {
     });
 
     // GET PET BY ID
-
     app.get("/pets/:id", async (req, res) => {
       try {
         const pet = await petsCollection.findOne({
@@ -75,7 +72,6 @@ async function run() {
     });
 
     // UPDATE PET
-
     app.patch("/pets/:id", async (req, res) => {
       try {
         const result = await petsCollection.updateOne(
@@ -97,7 +93,6 @@ async function run() {
     });
 
     // DELETE PET
-
     app.delete("/pets/:id", async (req, res) => {
       try {
         const result = await petsCollection.deleteOne({
@@ -113,7 +108,6 @@ async function run() {
     });
 
     // MY LISTINGS
-
     app.get("/my-listings", async (req, res) => {
       try {
         const email = req.query.email;
@@ -140,8 +134,34 @@ async function run() {
       }
     });
 
-    // ADD REQUEST
+    // REQUEST COUNTS
+    app.get("/my-listings-counts", async (req, res) => {
+      try {
+        const requests = await adoptionRequestsCollection
+          .find({
+            status: {
+              $ne: "deleted",
+            },
+          })
+          .toArray();
 
+        const counts = {};
+
+        requests.forEach((req) => {
+          if (!req.petId) return;
+
+          counts[req.petId] = (counts[req.petId] || 0) + 1;
+        });
+
+        res.send(counts);
+      } catch (error) {
+        res.status(500).json({
+          error: "Failed to load counts",
+        });
+      }
+    });
+
+    // ADD REQUEST
     app.post("/adoption-requests", async (req, res) => {
       try {
         const requestData = {
@@ -162,8 +182,26 @@ async function run() {
       }
     });
 
-    // GET REQUESTS BY PET
+    // GET SPECIFIC USER REQUESTS
+    app.get("/my-requests", async (req, res) => {
+      try {
+        const email = req.query.email;
 
+        if (!email) {
+          return res.status(400).send({ error: "Email required" });
+        }
+
+        const requests = await adoptionRequestsCollection
+          .find({ adopterEmail: email })
+          .toArray();
+
+        res.send(requests);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch requests" });
+      }
+    });
+
+    // GET REQUESTS BY PET
     app.get("/adoption-requests/pet/:petId", async (req, res) => {
       try {
         const requests = await adoptionRequestsCollection
@@ -184,7 +222,6 @@ async function run() {
     });
 
     // UPDATE REQUEST STATUS
-
     app.patch("/adoption-requests/:id", async (req, res) => {
       try {
         const { status, petId } = req.body;
@@ -221,31 +258,16 @@ async function run() {
       }
     });
 
-    // REQUEST COUNTS
-
-    app.get("/my-listings-counts", async (req, res) => {
+    // DELETE REQUEST
+    app.delete("/adoption-requests/:id", async (req, res) => {
       try {
-        const requests = await adoptionRequestsCollection
-          .find({
-            status: {
-              $ne: "deleted",
-            },
-          })
-          .toArray();
-
-        const counts = {};
-
-        requests.forEach((req) => {
-          if (!req.petId) return;
-
-          counts[req.petId] = (counts[req.petId] || 0) + 1;
+        await adoptionRequestsCollection.deleteOne({
+          _id: new ObjectId(req.params.id),
         });
 
-        res.send(counts);
+        res.send({ success: true, message: "Request deleted" });
       } catch (error) {
-        res.status(500).json({
-          error: "Failed to load counts",
-        });
+        res.status(500).send({ error: "Delete failed" });
       }
     });
 
@@ -253,8 +275,12 @@ async function run() {
       ping: 1,
     });
 
-    console.log("MongoDB Connected");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!",
+    );
   } finally {
+    // Ensures that the client will close when you finish/error
+    // await client.close();
   }
 }
 
