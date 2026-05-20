@@ -2,6 +2,7 @@ const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const { jwtVerify, createRemoteJWKSet } = require("jose-cjs");
 
 dotenv.config();
 
@@ -21,6 +22,37 @@ const client = new MongoClient(uri, {
   },
 });
 
+const JWKS = createRemoteJWKSet(
+  new URL("http://localhost:3000/api/auth/jwks")
+)
+
+// verify token
+const verifyToken = async(req, res, next) => {
+  const authHeader = req?.headers?.authorization;
+  if (!authHeader) {
+    return res.status(401).json({
+      error: "Unauthorized",
+    });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      error: "Unauthorized",
+    });
+  }
+
+  try {const {payload} = await jwtVerify(token, JWKS)
+  console.log(payload);
+  next();
+} catch (error) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
+};
+
 async function run() {
   try {
     await client.connect();
@@ -31,7 +63,7 @@ async function run() {
     const adoptionRequestsCollection = db.collection("adoptionRequests");
 
     // ADD PET
-    app.post("/pets", async (req, res) => {
+    app.post("/pets",verifyToken, async (req, res) => {
       try {
         const result = await petsCollection.insertOne(req.body);
 
@@ -51,7 +83,7 @@ async function run() {
     });
 
     // GET PET BY ID
-    app.get("/pets/:id", async (req, res) => {
+    app.get("/pets/:id", verifyToken, async (req, res) => {
       try {
         const pet = await petsCollection.findOne({
           _id: new ObjectId(req.params.id),
@@ -72,7 +104,7 @@ async function run() {
     });
 
     // UPDATE PET
-    app.patch("/pets/:id", async (req, res) => {
+    app.patch("/pets/:id", verifyToken, async (req, res) => {
       try {
         const result = await petsCollection.updateOne(
           { _id: new ObjectId(req.params.id) },
@@ -93,7 +125,7 @@ async function run() {
     });
 
     // DELETE PET
-    app.delete("/pets/:id", async (req, res) => {
+    app.delete("/pets/:id", verifyToken, async (req, res) => {
       try {
         const result = await petsCollection.deleteOne({
           _id: new ObjectId(req.params.id),
@@ -108,7 +140,7 @@ async function run() {
     });
 
     // MY LISTINGS
-    app.get("/my-listings", async (req, res) => {
+    app.get("/my-listings", verifyToken, async (req, res) => {
       try {
         const email = req.query.email;
 
@@ -162,7 +194,7 @@ async function run() {
     });
 
     // ADD REQUEST
-    app.post("/adoption-requests", async (req, res) => {
+    app.post("/adoption-requests", verifyToken, async (req, res) => {
       try {
         const requestData = {
           ...req.body,
@@ -183,7 +215,7 @@ async function run() {
     });
 
     // GET SPECIFIC USER REQUESTS
-    app.get("/my-requests", async (req, res) => {
+    app.get("/my-requests", verifyToken, async (req, res) => {
       try {
         const email = req.query.email;
 
@@ -202,7 +234,7 @@ async function run() {
     });
 
     // GET REQUESTS BY PET
-    app.get("/adoption-requests/pet/:petId", async (req, res) => {
+    app.get("/adoption-requests/pet/:petId", verifyToken, async (req, res) => {
       try {
         const requests = await adoptionRequestsCollection
           .find({
@@ -222,7 +254,7 @@ async function run() {
     });
 
     // UPDATE REQUEST STATUS
-    app.patch("/adoption-requests/:id", async (req, res) => {
+    app.patch("/adoption-requests/:id", verifyToken, async (req, res) => {
       try {
         const { status, petId } = req.body;
 
@@ -259,7 +291,7 @@ async function run() {
     });
 
     // DELETE REQUEST
-    app.delete("/adoption-requests/:id", async (req, res) => {
+    app.delete("/adoption-requests/:id", verifyToken, async (req, res) => {
       try {
         await adoptionRequestsCollection.deleteOne({
           _id: new ObjectId(req.params.id),
